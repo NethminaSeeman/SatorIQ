@@ -3,3 +3,4 @@ __pycache__/
 .env
 .streamlit/secrets.toml
 data/vector_db/
+data/raw_papers/*.pdf
