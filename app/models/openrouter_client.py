@@ -21,4 +21,8 @@ class OpenRouterClient:
             api_key=self.api_key,
             base_url="https://openrouter.ai/api/v1",
             temperature=0.2, # Slight temperature for analysis creativity
+            default_headers={
+                "HTTP-Referer": "http://localhost:8501", 
+                "X-Title": "SatorIQ",
+            }
         )

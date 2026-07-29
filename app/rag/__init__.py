@@ -1,3 +1,0 @@
-"""
-SatorIQ - RAG Pipeline Package
-"""
