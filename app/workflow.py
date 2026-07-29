@@ -18,6 +18,14 @@ def route_next(state: GraphState):
         # For this assignment, we mostly pursue the full RAG pipeline.
         return END
 
+def route_reflection(state: GraphState):
+    """Conditional routing based on Reflection Agent's critique."""
+    if state.get("reflection_approved"):
+        return END
+    else:
+        # Loop back to Analysis for improvement
+        return "analysis"
+
 def build_workflow():
     """
     Constructs the LangGraph state machine orchestrating all agents.
@@ -54,7 +62,11 @@ def build_workflow():
     workflow.add_edge("retriever", "summary")
     workflow.add_edge("summary", "analysis")
     workflow.add_edge("analysis", "reflection")
-    workflow.add_edge("reflection", END)
+    workflow.add_conditional_edges(
+        "reflection",
+        route_reflection,
+        {"analysis": "analysis", END: END}
+    )
     
     # Compile
     return workflow.compile()
