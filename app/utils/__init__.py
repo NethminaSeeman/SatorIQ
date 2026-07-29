@@ -1,3 +1,0 @@
-"""
-SatorIQ - Utility Functions Package
-"""

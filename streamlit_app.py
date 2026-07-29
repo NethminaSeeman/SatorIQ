@@ -28,6 +28,17 @@ with st.sidebar:
         st.error("Missing GROQ_API_KEY")
     if not os.environ.get("OPENROUTER_API_KEY"):
         st.error("Missing OPENROUTER_API_KEY")
+        
+    st.divider()
+    if st.button("🏗️ Build Vector Index (Run Once)"):
+        with st.spinner("Reading PDFs, chunking, and embedding... this may take a minute."):
+            from app.rag.retriever import RAGRetriever
+            try:
+                rag = RAGRetriever()
+                rag.rebuild_index()
+                st.success("Vector DB Index built successfully! You can now query papers.")
+            except Exception as e:
+                st.error(f"Failed to build index: {e}")
 
 st.title("Research Assistant")
 st.write("Ask questions about the uploaded research papers, and watch the agents collaborate to find the answer.")

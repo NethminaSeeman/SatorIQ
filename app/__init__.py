@@ -1,3 +1,0 @@
-"""
-SatorIQ - Core Application Package
-"""

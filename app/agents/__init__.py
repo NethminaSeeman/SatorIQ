@@ -1,3 +1,0 @@
-"""
-SatorIQ - AI Agents Package
-"""

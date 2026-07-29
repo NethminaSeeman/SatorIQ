@@ -35,7 +35,7 @@ class AnalysisAgent:
             state["analysis_result"] = response.content
         except Exception as e:
             print(f"AnalysisAgent Error: {e}")
-            state["analysis_result"] = "Error performing analysis. Please check your OpenRouter API Key."
+            state["analysis_result"] = f"Error performing analysis: {str(e)}\n\nPlease ensure your OPENROUTER_API_KEY is valid and has credits."
             
         state["current_task"] = "reflect"
         return state
