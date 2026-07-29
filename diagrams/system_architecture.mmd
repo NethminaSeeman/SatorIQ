@@ -1,27 +1,32 @@
 flowchart TD
     user[User]
     streamlit[Streamlit Web Interface]
-    router[Router / Planner Agent]
+    router[Router / Planner Agent - Groq]
     retriever[Retriever Agent - RAG Search]
     chromadb[(Chroma Vector Database)]
     chunks[Retrieved Chunks]
-    summary[Summary Agent]
-    analysis[Analysis Agent]
+    summary[Summary Agent - Groq]
+    analysis[Analysis Agent - OpenRouter]
     join[Join Barrier]
-    reflection[Reflection Agent]
+    reflection[Reflection Agent - Groq]
     response[Final Response]
+    earlyEnd[Early End]
 
     user --> streamlit
     streamlit --> router
-    router --> retriever
+    router -->|direct| earlyEnd
+    router -->|retrieve| retriever
     retriever --> chromadb
-    chromadb --> chunks
+    chromadb --> retriever
+    retriever -->|empty index| reflection
+    retriever --> chunks
     chunks --> summary
     chunks --> analysis
     summary --> join
-    analysis --> join
+    analysis -->|first pass| join
     join --> reflection
+    analysis -->|retry pass| reflection
     reflection -->|approved| response
-    reflection -->|"retry max 2"| analysis
+    reflection -->|retry max 2| analysis
     response --> streamlit
     streamlit --> user
