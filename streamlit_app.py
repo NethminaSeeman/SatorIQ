@@ -7,6 +7,7 @@ load_dotenv()
 
 from app.workflow import build_workflow
 from app.agents.state import GraphState
+from app.utils.citation_helpers import build_paper_contributions, cited_sources_in_answer
 
 st.set_page_config(page_title="SatorIQ Assistant", page_icon="🧠", layout="wide")
 
@@ -118,6 +119,7 @@ if query:
         status_box = st.status("Agents are thinking...", expanded=True)
         final_answer = ""
         retrieved_sources: list[str] = []
+        retrieved_docs: list[dict] = []
         
         try:
             # We use stream() to catch events as they happen from each node
@@ -134,6 +136,8 @@ if query:
                         chunks_len = len(value.get("retrieved_chunks", []))
                         if value.get("retrieved_sources"):
                             retrieved_sources = value.get("retrieved_sources", [])
+                        if value.get("retrieved_docs"):
+                            retrieved_docs = value.get("retrieved_docs", [])
                         if chunks_len == 0:
                             status_box.write(
                                 "🔍 **Retriever:** No chunks found — vector index may be empty. "
@@ -172,7 +176,40 @@ if query:
             # Display Final Answer outside the status box
             if final_answer:
                 st.markdown(final_answer)
-                if retrieved_sources:
+
+                if retrieved_docs:
+                    contributions = build_paper_contributions(final_answer, retrieved_docs)
+                    paper_contribs = [
+                        item for item in contributions
+                        if item["source"] != "_general_synthesis_"
+                    ]
+
+                    if paper_contribs:
+                        with st.expander("📖 Which paper says what? (Literature review map)", expanded=True):
+                            st.caption(
+                                "Each paper below lists the specific claims from the answer "
+                                "that cite that source — use this to jump straight to relevant papers."
+                            )
+                            for item in paper_contribs:
+                                source = item["source"]
+                                pages = item["pages"]
+                                page_label = (
+                                    f" (pages {', '.join(str(p) for p in pages)})"
+                                    if pages else ""
+                                )
+                                st.markdown(f"**`{source}`**{page_label}")
+                                for claim in item["claims"]:
+                                    st.markdown(f"- {claim}")
+                                st.divider()
+
+                    cited = cited_sources_in_answer(final_answer, retrieved_docs)
+                    uncited_retrieved = sorted(set(retrieved_sources) - set(cited))
+                    if uncited_retrieved:
+                        with st.expander("📄 Retrieved but not cited in answer"):
+                            for source in uncited_retrieved:
+                                st.markdown(f"- `{source}`")
+
+                elif retrieved_sources:
                     unique_sources = sorted(set(retrieved_sources))
                     with st.expander("📚 Sources cited"):
                         for source in unique_sources:

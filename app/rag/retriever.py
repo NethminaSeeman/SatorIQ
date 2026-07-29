@@ -45,7 +45,7 @@ class RAGRetriever:
         Returns:
             dict: Structured dictionary containing the retrieved chunks and their sources.
         """
-        empty_result: Dict[str, Any] = {"chunks": [], "sources": []}
+        empty_result: Dict[str, Any] = {"chunks": [], "sources": [], "docs": []}
 
         try:
             retriever = self.vector_store.get_retriever(search_kwargs={"k": top_k})
@@ -57,10 +57,27 @@ class RAGRetriever:
         if not docs:
             return empty_result
 
+        structured_docs = []
+        chunks = []
+        sources = []
+
+        for index, doc in enumerate(docs, start=1):
+            source = os.path.basename(doc.metadata.get("source", "Unknown Source"))
+            page = doc.metadata.get("page")
+            if page is not None:
+                page = int(page) + 1  # PyPDFLoader uses 0-based pages
+
+            chunks.append(doc.page_content)
+            sources.append(source)
+            structured_docs.append({
+                "source": source,
+                "page": page,
+                "content": doc.page_content,
+                "label": f"Source {index}",
+            })
+
         return {
-            "chunks": [doc.page_content for doc in docs],
-            "sources": [
-                os.path.basename(doc.metadata.get("source", "Unknown Source"))
-                for doc in docs
-            ],
+            "chunks": chunks,
+            "sources": sources,
+            "docs": structured_docs,
         }

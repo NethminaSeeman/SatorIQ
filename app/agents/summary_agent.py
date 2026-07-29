@@ -1,5 +1,6 @@
 from langchain_core.messages import SystemMessage, HumanMessage
 from app.agents.state import GraphState
+from app.utils.citation_helpers import format_labeled_chunks
 
 
 class SummaryAgent:
@@ -18,13 +19,16 @@ class SummaryAgent:
             existing = state.get("summary_result")
             return {"summary_result": existing or "No relevant documents were retrieved."}
 
-        chunks_text = "\n\n".join(state.get("retrieved_chunks", []))
+        docs = state.get("retrieved_docs", [])
+        chunks = state.get("retrieved_chunks", [])
+        chunks_text = format_labeled_chunks(docs) if docs else "\n\n".join(chunks)
         if not chunks_text:
             return {"summary_result": "No relevant documents were retrieved."}
 
         system_prompt = """
         You are a highly efficient academic assistant.
         Summarize the following retrieved text chunks. Extract key findings, methodology, and conclusions.
+        Note which source (Source 1, Source 2, etc.) each finding comes from.
         Be concise, accurate, and discard irrelevant information.
         """
 
