@@ -27,15 +27,18 @@ class AnalysisAgent:
         if state.get("error_message"):
             content_prompt += f"\n\nPrevious Reviewer Feedback (MUST ADDRESS): {state.get('error_message')}"
             
-        try:
-            response = self.llm.invoke([
-                SystemMessage(content=system_prompt),
-                HumanMessage(content=content_prompt)
-            ])
-            state["analysis_result"] = response.content
-        except Exception as e:
-            print(f"AnalysisAgent Error: {e}")
-            state["analysis_result"] = f"Error performing analysis: {str(e)}\n\nPlease ensure your OPENROUTER_API_KEY is valid and has credits."
+        if state.get('summary_result') == "No relevant documents were retrieved.":
+            state["analysis_result"] = "I could not find any relevant papers in your database to answer your question. Please make sure you have added PDF research papers to the `data/raw_papers/` folder and clicked **Build Vector Index**."
+        else:
+            try:
+                response = self.llm.invoke([
+                    SystemMessage(content=system_prompt),
+                    HumanMessage(content=content_prompt)
+                ])
+                state["analysis_result"] = response.content
+            except Exception as e:
+                print(f"AnalysisAgent Error: {e}")
+                state["analysis_result"] = f"Error performing analysis: {str(e)}\n\nPlease ensure your OPENROUTER_API_KEY is valid and has credits."
             
         state["current_task"] = "reflect"
         return state
