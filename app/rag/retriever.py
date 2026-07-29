@@ -1,4 +1,5 @@
 from typing import List, Dict, Any
+import os
 from app.rag.loader import PDFLoader
 from app.rag.chunker import TextChunker
 from app.rag.vector_store import VectorStoreManager
@@ -58,5 +59,8 @@ class RAGRetriever:
 
         return {
             "chunks": [doc.page_content for doc in docs],
-            "sources": [doc.metadata.get("source", "Unknown Source") for doc in docs],
+            "sources": [
+                os.path.basename(doc.metadata.get("source", "Unknown Source"))
+                for doc in docs
+            ],
         }
