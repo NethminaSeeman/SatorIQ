@@ -1,0 +1,23 @@
+flowchart TD
+    user[User]
+    streamlit[Streamlit Interface]
+    router[Router Agent - Groq]
+    retriever[Retriever Agent - RAG Search]
+    chromadb[(ChromaDB Database)]
+    summary[Summary Agent - Groq]
+    analysis[Analysis Agent - OpenRouter]
+    reflection[Reflection Agent - Groq]
+    response[Final Response]
+
+    user --> streamlit
+    streamlit --> router
+    router --> retriever
+    retriever --> chromadb
+    chromadb --> retriever
+    retriever --> summary
+    summary --> analysis
+    analysis --> reflection
+    reflection -->|"approved"| response
+    reflection -->|"needs revision"| analysis
+    response --> streamlit
+    streamlit --> user
