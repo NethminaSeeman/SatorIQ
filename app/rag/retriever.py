@@ -44,12 +44,19 @@ class RAGRetriever:
         Returns:
             dict: Structured dictionary containing the retrieved chunks and their sources.
         """
-        retriever = self.vector_store.get_retriever(search_kwargs={"k": top_k})
-        docs = retriever.invoke(query)
-        
-        # Structure the results for the Retriever Agent
-        result = {
+        empty_result: Dict[str, Any] = {"chunks": [], "sources": []}
+
+        try:
+            retriever = self.vector_store.get_retriever(search_kwargs={"k": top_k})
+            docs = retriever.invoke(query)
+        except Exception as e:
+            print(f"RAGRetriever Error: {e}")
+            return empty_result
+
+        if not docs:
+            return empty_result
+
+        return {
             "chunks": [doc.page_content for doc in docs],
-            "sources": [doc.metadata.get("source", "Unknown Source") for doc in docs]
+            "sources": [doc.metadata.get("source", "Unknown Source") for doc in docs],
         }
-        return result
