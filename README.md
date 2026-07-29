@@ -20,7 +20,9 @@ Specialists retrieve academic papers from ChromaDB, summarize findings, compare 
 - RAG over 22 academic PDFs on Explainable AI in healthcare (expandable to 20–30 papers)
 - ChromaDB + Sentence Transformers (`all-MiniLM-L6-v2`) vector search over chunked research papers
 - Dual LLM routing — Groq for fast planning/summary/reflection, OpenRouter for deep analysis
-- Reflection loop sends failed answers back to Analysis for self-correction
+- **Parallel workers** — Summary and Analysis run concurrently after retrieval, then join at Reflection
+- Reflection loop (max **2 retries**) sends failed answers back to Analysis for self-correction
+- Safe fallbacks when the vector index is empty — no infinite retry loops on deployed instances
 - One-click **Build Vector Index** sidebar control for PDF ingestion
 
 ---
@@ -58,17 +60,23 @@ flowchart TD
   router -->|direct| endNode[Early_End]
   retriever --> chroma[(ChromaDB)]
   chroma --> retriever
-  retriever --> summary[Summary_Agent_Groq]
-  summary --> analysis[Analysis_Agent_OpenRouter]
-  analysis --> reflection[Reflection_Agent_Groq]
+  retriever --> chunks[Retrieved_Chunks]
+  chunks --> summary[Summary_Agent_Groq]
+  chunks --> analysis[Analysis_Agent_OpenRouter]
+  summary --> join[Join_Barrier]
+  analysis --> join
+  join --> reflection[Reflection_Agent_Groq]
   reflection -->|approved| final[Final_Answer]
-  reflection -->|needs_revision| analysis
+  reflection -->|"retry max 2"| analysis
   final --> ui
 ```
 
+Source diagram: [`diagrams/system_architecture.mmd`](diagrams/system_architecture.mmd)
+
 ### Agent-to-agent communication
 
-Agents exchange structured data through shared LangGraph state (`GraphState`), not free-form chat.
+Agents exchange structured data through shared LangGraph state (`GraphState`), not free-form chat.  
+Each agent returns **only the fields it owns** so parallel Summary/Analysis nodes do not conflict.
 
 ```mermaid
 sequenceDiagram
@@ -77,47 +85,60 @@ sequenceDiagram
   participant Retriever as RetrieverAgent
   participant Summary as SummaryAgent
   participant Analysis as AnalysisAgent
+  participant Join as JoinBarrier
   participant Reflection as ReflectionAgent
   User->>Router: user_query
-  Router->>Retriever: routing_decision_retrieve
+  Router->>Retriever: routing_decision + search_query
   Retriever->>Retriever: ChromaDB_search
-  Retriever->>Summary: retrieved_chunks_and_sources
-  Summary->>Analysis: summary_result
-  Analysis->>Reflection: analysis_result
-  Reflection->>Analysis: error_message_if_rejected
-  Reflection-->>User: final_answer
+  par Parallel workers
+    Retriever->>Summary: retrieved_chunks
+    Retriever->>Analysis: retrieved_chunks
+  end
+  Summary->>Join: summary_result
+  Analysis->>Join: analysis_result
+  Join->>Reflection: merged_state
+  alt approved
+    Reflection-->>User: final_answer
+  else rejected max 2 retries
+    Reflection->>Analysis: error_message
+    Analysis->>Reflection: revised analysis_result
+  end
 ```
 
 State contract lives in [`app/agents/state.py`](app/agents/state.py):
 
 | Field | Set by | Purpose |
 |-------|--------|---------|
-| `user_query` | User / Router | Original or optimized search query |
+| `user_query` | User | Original question from the chat input |
+| `search_query` | Router | Optimized retrieval query (if Router rewrites it) |
 | `routing_decision` | Router | `"retrieve"` or `"direct"` |
 | `retrieved_chunks` | Retriever | Top-k document chunks from ChromaDB |
 | `retrieved_sources` | Retriever | Source PDF filenames |
-| `summary_result` | Summary | Condensed research findings |
-| `analysis_result` | Analysis | Full synthesized answer |
+| `summary_result` | Summary | Condensed research findings (parallel worker) |
+| `analysis_result` | Analysis | Full synthesized answer (parallel worker) |
 | `reflection_approved` | Reflection | Quality gate boolean |
+| `reflection_retry_count` | Reflection | Number of revision attempts (max 2) |
+| `skip_reflection` | Retriever / Analysis | Skip retry loop when index empty or on API errors |
 | `final_answer` | Reflection | Approved response shown to user |
 | `error_message` | Reflection | Feedback sent back to Analysis on retry |
+| `current_task` | Agents / Join | Pipeline stage tracker |
 
 Example payloads (conceptual):
 
 ```python
 # Router → Retriever
-{"task": "retrieve", "query": "Explainable AI in healthcare"}
+{"task": "retrieve", "search_query": "Explainable AI in healthcare"}
 
-# Retriever → Summary
+# Retriever → Summary & Analysis (parallel)
 {"chunks": ["..."], "sources": ["paper1.pdf", "paper2.pdf"]}
 
-# Summary → Analysis
+# Summary → Join → Reflection
 {"summary": "Key findings from retrieved papers..."}
 
-# Analysis → Reflection
+# Analysis → Join → Reflection
 {"analysis": "Comprehensive markdown answer..."}
 
-# Reflection → Final
+# Reflection → Final (or retry Analysis, max 2 times)
 {"approved": True, "answer": "Final approved response..."}
 ```
 
@@ -129,9 +150,12 @@ Example payloads (conceptual):
 |---------|-------|------|
 | **Planning / Router** | [`app/agents/router_agent.py`](app/agents/router_agent.py) | Analyzes query, returns JSON plan, routes to retrieval pipeline |
 | **Tool-use** | [`app/agents/retriever_agent.py`](app/agents/retriever_agent.py) | Invokes RAG facade → ChromaDB vector search |
-| **Sequential workflow** | [`app/workflow.py`](app/workflow.py) | Retriever → Summary → Analysis → Reflection in fixed order |
-| **Reflection** | [`app/agents/reflection_agent.py`](app/agents/reflection_agent.py) | Critiques Analysis output; loops back if incomplete |
-| **Orchestrator** | [`app/workflow.py`](app/workflow.py) | LangGraph `StateGraph` coordinates all agents |
+| **Parallel orchestration** | [`app/workflow.py`](app/workflow.py) | After retrieval, Summary and Analysis run concurrently on the same chunks |
+| **Join barrier** | [`app/workflow.py`](app/workflow.py) `join_workers` | Waits for both parallel workers before Reflection runs |
+| **Reflection** | [`app/agents/reflection_agent.py`](app/agents/reflection_agent.py) | Critiques Analysis; loops back up to 2 times, then auto-approves |
+| **Orchestrator** | [`app/workflow.py`](app/workflow.py) | LangGraph `StateGraph` with `Annotated` reducers for safe parallel merges |
+
+Helpers: [`app/utils/pipeline_helpers.py`](app/utils/pipeline_helpers.py)
 
 ---
 
@@ -164,7 +188,7 @@ User questions need **grounded answers** from your local research corpus — not
 | Vector store | ChromaDB persisted under gitignored `data/vector_db/` |
 | Retriever | Top-k = 4 chunks per query |
 | Build | Sidebar **Build Vector Index** or `RAGRetriever().rebuild_index()` |
-| Used by | Retriever Agent → shared state → Summary & Analysis |
+| Used by | Retriever Agent → shared state → **Summary & Analysis in parallel** |
 
 Code: [`app/rag/retriever.py`](app/rag/retriever.py), [`app/rag/vector_store.py`](app/rag/vector_store.py), [`app/rag/embeddings.py`](app/rag/embeddings.py).
 
@@ -256,7 +280,9 @@ Covers chunker output, embedding initialization, and ChromaDB add/search.
 - PDFs are **not** in git (too large); each environment must load papers locally.
 - First embedding model download adds cold-start latency.
 - Router may fall back to `"retrieve"` if JSON parsing fails.
-- Reflection approves gracefully on LLM errors to avoid infinite loops.
+- Reflection retries Analysis at most **2 times**, then approves the best available answer.
+- Empty vector index or API errors set `skip_reflection=True` to prevent infinite loops.
+- On reflection retry, Analysis routes directly back to Reflection (Summary does not re-run).
 - Streamlit Cloud requires manual PDF upload or a pre-built index strategy for live demos.
 - Uses `print()` for agent tracing; production would use structured logging.
 

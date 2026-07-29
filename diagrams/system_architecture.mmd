@@ -7,6 +7,7 @@ flowchart TD
     chunks[Retrieved Chunks]
     summary[Summary Agent]
     analysis[Analysis Agent]
+    join[Join Barrier]
     reflection[Reflection Agent]
     response[Final Response]
 
@@ -17,8 +18,9 @@ flowchart TD
     chromadb --> chunks
     chunks --> summary
     chunks --> analysis
-    summary --> reflection
-    analysis --> reflection
+    summary --> join
+    analysis --> join
+    join --> reflection
     reflection -->|approved| response
     reflection -->|"retry max 2"| analysis
     response --> streamlit
