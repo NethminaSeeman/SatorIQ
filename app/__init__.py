@@ -1,1 +1,0 @@
-"""SatorIQ application package."""
