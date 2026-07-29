@@ -99,6 +99,7 @@ if query:
     with st.chat_message("assistant"):
         status_box = st.status("Agents are thinking...", expanded=True)
         final_answer = ""
+        retrieved_sources: list[str] = []
         
         try:
             # We use stream() to catch events as they happen from each node
@@ -113,6 +114,8 @@ if query:
                         
                     elif key == "retriever":
                         chunks_len = len(value.get("retrieved_chunks", []))
+                        if value.get("retrieved_sources"):
+                            retrieved_sources = value.get("retrieved_sources", [])
                         if chunks_len == 0:
                             status_box.write(
                                 "🔍 **Retriever:** No chunks found — vector index may be empty. "
@@ -151,6 +154,11 @@ if query:
             # Display Final Answer outside the status box
             if final_answer:
                 st.markdown(final_answer)
+                if retrieved_sources:
+                    unique_sources = sorted(set(retrieved_sources))
+                    with st.expander("📚 Sources cited"):
+                        for source in unique_sources:
+                            st.markdown(f"- `{source}`")
             else:
                 st.warning("No definitive answer was reached.")
                 
