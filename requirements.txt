@@ -1,6 +1,7 @@
 streamlit
 langchain
 langchain-community
+langchain-text-splitters
 langgraph
 langchain-chroma
 langchain-groq
@@ -9,3 +10,4 @@ chromadb
 sentence-transformers
 python-dotenv
 pypdf
+pytest
