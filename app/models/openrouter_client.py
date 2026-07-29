@@ -6,7 +6,7 @@ class OpenRouterClient:
     Client wrapper for generalizing OpenRouter models via LangChain's OpenAI integration.
     Used for the Analysis agent.
     """
-    def __init__(self, model_name: str = "meta-llama/llama-3-8b-instruct"):
+    def __init__(self, model_name: str = "meta-llama/llama-3.1-8b-instruct:free"):
         self.model_name = model_name
         self.api_key = os.environ.get("OPENROUTER_API_KEY")
         if not self.api_key:
