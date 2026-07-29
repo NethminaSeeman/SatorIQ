@@ -34,6 +34,14 @@ class VectorStoreManager:
         self.db.add_documents(documents)
         print("Documents successfully added to the vector store.")
 
+    def get_chunk_count(self) -> int:
+        """Return the number of indexed chunks, or 0 if the store is empty/unavailable."""
+        try:
+            return self.db._collection.count()
+        except Exception as e:
+            print(f"Could not read vector index size: {e}")
+            return 0
+
     def get_retriever(self, search_kwargs: dict = None):
         """
         Returns a LangChain retriever interface for the vector store.

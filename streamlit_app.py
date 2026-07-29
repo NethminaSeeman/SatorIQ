@@ -22,13 +22,43 @@ with st.sidebar:
     st.markdown("- 🧠 Analysis (OpenRouter)")
     st.markdown("- 🤔 Reflection (Groq)")
     st.divider()
-    
+
     # Check for API Keys
     if not os.environ.get("GROQ_API_KEY"):
         st.error("Missing GROQ_API_KEY")
     if not os.environ.get("OPENROUTER_API_KEY"):
         st.error("Missing OPENROUTER_API_KEY")
-        
+
+    st.divider()
+    st.markdown("**Knowledge Base**")
+
+    @st.cache_resource(show_spinner=False)
+    def get_index_chunk_count() -> int:
+        from app.rag.vector_store import VectorStoreManager
+        return VectorStoreManager().get_chunk_count()
+
+    chunk_count = get_index_chunk_count()
+    if chunk_count > 0:
+        st.success(f"Vector index ready ({chunk_count:,} chunks indexed)")
+    else:
+        st.error("Vector index is empty — upload PDFs below and build the index.")
+
+    uploaded_pdfs = st.file_uploader(
+        "Upload research PDFs",
+        type=["pdf"],
+        accept_multiple_files=True,
+        help="Optional: add or replace papers, then rebuild the index.",
+    )
+    if uploaded_pdfs:
+        os.makedirs("data/raw_papers", exist_ok=True)
+        saved = 0
+        for uploaded in uploaded_pdfs:
+            dest = os.path.join("data/raw_papers", uploaded.name)
+            with open(dest, "wb") as f:
+                f.write(uploaded.getbuffer())
+            saved += 1
+        st.info(f"Saved {saved} PDF(s) to data/raw_papers/.")
+
     st.divider()
     if st.button("🏗️ Build Vector Index (Run Once)"):
         with st.spinner("Reading PDFs, chunking, and embedding... this may take a minute."):
@@ -36,7 +66,9 @@ with st.sidebar:
             try:
                 rag = RAGRetriever()
                 rag.rebuild_index()
-                st.success("Vector DB Index built successfully! You can now query papers.")
+                get_index_chunk_count.clear()
+                st.success("Vector DB index built successfully! You can now query papers.")
+                st.rerun()
             except Exception as e:
                 st.error(f"Failed to build index: {e}")
 
