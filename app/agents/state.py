@@ -1,4 +1,4 @@
-from typing import Annotated, TypedDict, List, Optional
+from typing import Annotated, TypedDict, List, Optional, Any
 
 # Maximum times Reflection may send work back to Analysis before forcing completion.
 MAX_REFLECTION_RETRIES = 2
@@ -19,6 +19,7 @@ class GraphState(TypedDict, total=False):
     routing_decision: Annotated[str, last_wins]
     retrieved_chunks: Annotated[List[str], last_wins]
     retrieved_sources: Annotated[List[str], last_wins]
+    retrieved_docs: Annotated[List[Any], last_wins]
     summary_result: Annotated[str, last_wins]
     analysis_result: Annotated[str, last_wins]
     reflection_approved: Annotated[bool, last_wins]

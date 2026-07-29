@@ -1,6 +1,7 @@
 from langchain_core.messages import SystemMessage, HumanMessage
 from app.agents.state import GraphState
 from app.utils.pipeline_helpers import is_non_retriable_answer
+from app.utils.citation_helpers import format_labeled_chunks, format_source_index
 
 
 class AnalysisAgent:
@@ -18,9 +19,10 @@ class AnalysisAgent:
         if state.get("skip_reflection") and state.get("analysis_result"):
             return {"analysis_result": state["analysis_result"]}
 
+        docs = state.get("retrieved_docs", [])
         chunks = state.get("retrieved_chunks", [])
-        chunks_text = "\n\n".join(chunks)
         sources = state.get("retrieved_sources", [])
+        chunks_text = format_labeled_chunks(docs) if docs else "\n\n".join(chunks)
 
         if not chunks_text:
             message = (
@@ -35,18 +37,29 @@ class AnalysisAgent:
             }
 
         system_prompt = """
-        You are a Senior Academic Researcher.
+        You are a Senior Academic Researcher helping with a fast literature review.
         Draft a comprehensive, well-structured answer to the user's query based ONLY on the provided research chunks.
-        Compare and synthesize the findings across sources. Cite themes from the retrieved text only.
+
+        CITATION RULES (required for literature review):
+        - Every factual claim, finding, or conclusion MUST end with an inline citation.
+        - Use the exact label from each chunk header, e.g. [Source 1: paper.pdf, p.3] or [Source 2: other.pdf].
+        - When comparing papers, state which paper supports each point explicitly.
+        - Do not invent sources — cite only the Source labels provided in the chunks.
+
+        After your main answer, add a section titled "## Paper-by-paper contributions" with one bullet per source:
+        - **filename.pdf** — list the specific topics, findings, or claims this paper contributes to the answer.
+
         If critique/feedback is provided from a previous review, address it and improve your answer.
         Output your analysis directly in markdown format.
         """
 
-        source_list = "\n".join(f"- {source}" for source in sources[:8])
+        source_list = format_source_index(docs) if docs else "\n".join(
+            f"- {source}" for source in sources[:8]
+        )
         content_prompt = (
             f"User Query: {state.get('user_query', '')}\n\n"
-            f"Retrieved Sources:\n{source_list}\n\n"
-            f"Retrieved Research Chunks:\n{chunks_text}"
+            f"Available Sources:\n{source_list}\n\n"
+            f"Retrieved Research Chunks (each labeled with its source):\n{chunks_text}"
         )
 
         if state.get("error_message"):

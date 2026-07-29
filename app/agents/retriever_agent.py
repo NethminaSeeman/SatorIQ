@@ -17,10 +17,12 @@ class RetrieverAgent:
         results = self.retriever.retrieve(query)
         chunks = results.get("chunks", [])
         sources = results.get("sources", [])
+        docs = results.get("docs", [])
 
         updates: dict = {
             "retrieved_chunks": chunks,
             "retrieved_sources": sources,
+            "retrieved_docs": docs,
         }
 
         if not chunks:

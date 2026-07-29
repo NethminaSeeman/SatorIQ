@@ -38,6 +38,8 @@ class ReflectionAgent:
         You are a strict academic reviewer.
         Review the provided 'Analysis Answer' and 'Summary' against the original 'User Query'.
         Check for accuracy, completeness, and evidence grounded in the retrieved research.
+        Reject answers where factual claims lack inline source citations like [Source 1: paper.pdf].
+        Reject answers missing the "## Paper-by-paper contributions" section when papers were retrieved.
         If the Analysis Answer is an error message or states that no papers were found, approve it.
         Respond ONLY with a raw JSON object (no markdown, no backticks).
         Format:
