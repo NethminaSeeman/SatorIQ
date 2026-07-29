@@ -10,6 +10,15 @@ from app.agents.state import GraphState
 
 st.set_page_config(page_title="SatorIQ Assistant", page_icon="🧠", layout="wide")
 
+SAMPLE_QUERIES = [
+    "What are the challenges of Explainable AI in healthcare?",
+    "How does XAI improve clinical decision-making?",
+    "Compare accuracy vs interpretability in medical AI.",
+]
+
+if "pending_query" not in st.session_state:
+    st.session_state["pending_query"] = None
+
 # Sidebar
 with st.sidebar:
     st.title("🧠 SatorIQ")
@@ -72,10 +81,19 @@ with st.sidebar:
             except Exception as e:
                 st.error(f"Failed to build index: {e}")
 
+    st.divider()
+    st.markdown("**Try a sample question**")
+    for sample in SAMPLE_QUERIES:
+        if st.button(sample, key=f"sample_{sample[:24]}"):
+            st.session_state["pending_query"] = sample
+            st.rerun()
+
 st.title("Research Assistant")
 st.write("Ask questions about the uploaded research papers, and watch the agents collaborate to find the answer.")
 
 query = st.chat_input("Enter your research question here...")
+if not query and st.session_state.get("pending_query"):
+    query = st.session_state.pop("pending_query")
 
 if query:
     # Display user's question
