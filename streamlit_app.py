@@ -56,7 +56,12 @@ if query:
         st.error(f"Failed to initialize workflow: {e}")
         st.stop()
         
-    initial_state = {"user_query": query}
+    initial_state = {
+        "user_query": query,
+        "reflection_retry_count": 0,
+        "skip_reflection": False,
+        "reflection_approved": False,
+    }
     
     # Execute workflow and show progress
     with st.chat_message("assistant"):
@@ -76,20 +81,34 @@ if query:
                         
                     elif key == "retriever":
                         chunks_len = len(value.get("retrieved_chunks", []))
-                        status_box.write(f"🔍 **Retriever:** Pulled {chunks_len} relevant chunks from ChromaDB.")
+                        if chunks_len == 0:
+                            status_box.write(
+                                "🔍 **Retriever:** No chunks found — vector index may be empty. "
+                                "Build the index from the sidebar."
+                            )
+                        else:
+                            status_box.write(
+                                f"🔍 **Retriever:** Pulled {chunks_len} relevant chunks from ChromaDB."
+                            )
                         
                     elif key == "summary":
-                        status_box.write("📝 **Summary:** Condensed the findings from the research chunks.")
+                        status_box.write("📝 **Summary:** Condensed findings from retrieved chunks (parallel worker).")
                         
                     elif key == "analysis":
-                        status_box.write("🧠 **Analysis:** Cross-compared sources to draft the response.")
+                        status_box.write("🧠 **Analysis:** Cross-compared sources to draft the response (parallel worker).")
                         
+                    elif key == "join":
+                        status_box.write("🔗 **Join:** Summary and Analysis complete — sending to Reflection.")
+
                     elif key == "reflection":
                         if value.get("reflection_approved"):
-                            status_box.write("✅ **Reflection:** Final answer approved. No revisions needed.")
+                            status_box.write("✅ **Reflection:** Final answer approved.")
                         else:
                             fb = value.get("error_message")
-                            status_box.write(f"⚠️ **Reflection Failed:** {fb} (Retrying Analysis)")
+                            retry = value.get("reflection_retry_count", 0)
+                            status_box.write(
+                                f"⚠️ **Reflection:** Revision requested ({retry}/2) — {fb}"
+                            )
                             
                     # Capture final answer whenever available (specifically after reflection approves)
                     if value.get("final_answer"):
