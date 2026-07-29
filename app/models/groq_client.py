@@ -6,7 +6,7 @@ class GroqClient:
     Client wrapper for initializing Groq models for LangChain/LangGraph usage.
     Used for Router, Summary, and Reflection agents.
     """
-    def __init__(self, model_name: str = "llama3-70b-8192"):
+    def __init__(self, model_name: str = "llama-3.3-70b-versatile"):
         self.model_name = model_name
         # Assumes GROQ_API_KEY is available in the environment
         if not os.environ.get("GROQ_API_KEY"):
